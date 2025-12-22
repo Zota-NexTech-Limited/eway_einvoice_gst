@@ -1,0 +1,32 @@
+{
+  "name": "eway_einvoice_gst",
+  "version": "0.1.0",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-main": "tsc",
+    "build": "npm run build-main && npm run copy-uploads",
+    "copy-uploads": "xcopy src\\uploads dist\\uploads /E /I /Y",
+    "start-main": "node --es-module-specifier-resolution=node dist/server.js",
+    "install-all": "npm install",
+    "start": "npm run install-all && npm run build-main && node ./postbuild.js && npm run start-main"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "nodejs": "^0.0.0",
+    "pg": "^8.16.3",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/pg": "^8.16.0",
+    "@types/qrcode": "^1.5.6",
+    "typescript": "^5.9.3"
+  }
+}
