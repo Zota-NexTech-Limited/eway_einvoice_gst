@@ -1483,4 +1483,1534 @@ router.post("/api/microvista/production-reject-ewb", async (req, res) => {
 
 // =============== MICROVISTA E-WAY BILL ROUTES END ===============
 
+
+// ==============GST APIs (GSTR1) ROUTES START==============
+
+// SEND OTP API
+const MICROVISTA_SEND_OTP_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGETOTP";
+router.post("/api/microvista/production-gst-send-otp", async (req, res) => {
+    try {
+        const { gstUserName } = req.body;
+
+        // Validate required field
+        if (!gstUserName) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required field: gstUserName"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_SEND_OTP_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "OTPREQUEST",
+                    "GSTUserName": gstUserName
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: data.Message || "OTP sent successfully",
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.Message || "Failed to send OTP",
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista Send OTP API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GST_AUTH_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGSTAuthentication";
+router.post("/api/microvista/production-gst-authentication", async (req, res) => {
+    try {
+        const { gstUserName, otp } = req.body;
+
+        // Validate required fields
+        if (!gstUserName || !otp) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: gstUserName or otp"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GST_AUTH_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "AUTHTOKEN",
+                    "GSTUserName": gstUserName,
+                    "OTP": otp
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "Authentication successful",
+                authToken: data.auth_token,
+                expiry: data.expiry,
+                sek: data.sek,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Authentication failed",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GST Authentication API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_REFRESH_TOKEN_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGSTRefreshToken";
+router.post("/api/microvista/production-gst-refresh-token", async (req, res) => {
+    try {
+        const { gstUserName, authToken } = req.body;
+
+        // Validate required fields
+        if (!gstUserName || !authToken) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: gstUserName, authToken"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call with username in body
+        const response = await axios.post(
+            MICROVISTA_REFRESH_TOKEN_URL,
+            {
+                username: gstUserName  // Send username in request body
+            },
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "REFRESHTOKEN",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "Auth token refreshed successfully",
+                data: {
+                    auth_token: data.auth_token,
+                    expiry: data.expiry,
+                    sek: data.sek
+                },
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to refresh auth token",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista Refresh Token API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR1_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGetGSTR1";
+router.post("/api/microvista/production-get-gstr1", async (req, res) => {
+    try {
+        const { gstUserName, authToken, returnPeriod, action } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken or returnPeriod"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR1_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": action || "B2B", // Default to B2B if not provided
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR1 data fetched successfully",
+                data: data,
+                // raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch GSTR1 data",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR1 API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR2A_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGetGSTR2A";
+router.post("/api/microvista/production-get-gstr2a", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, action, gstUserName } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken or returnPeriod"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR2A_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": action || "B2B", // Default to B2B if not provided
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR2A data fetched successfully",
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch GSTR2A data",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR2A API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR2B_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGetGSTR2B";
+router.post("/api/microvista/production-get-gstr2b", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, fileNum, gstUserName } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken or returnPeriod"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+        // const gstUserName = "dharmik12344";
+
+        // Build headers
+        const headers: any = {
+            "Content-Type": "application/json",
+            "MVApiKey": MVApiKey,
+            "MVSecretKey": MVSecretKey,
+            "GSTIN": gstin,
+            "Action": "GET2B",
+            "GSTUserName": gstUserName,
+            "AuthToken": authToken,
+            "ReturnPeriod": returnPeriod
+        };
+
+        // Add File_Num only if provided (optional parameter)
+        if (fileNum) {
+            headers["File_Num"] = fileNum.toString();
+        }
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR2B_URL,
+            {},
+            { headers }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR2B data fetched successfully",
+                data: data,
+                // raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch GSTR2B data",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR2B API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR2X_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGSTR2XGetTdsTcsCreditDetails";
+router.post("/api/microvista/production-get-gstr2x-tds-tcs", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, recordType, fromTime, gstUserName } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken or returnPeriod"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+        // const gstUserName = "dharmik12344";
+
+        // Build headers
+        const headers: any = {
+            "Content-Type": "application/json",
+            "MVApiKey": MVApiKey,
+            "MVSecretKey": MVSecretKey,
+            "GSTIN": gstin,
+            "Action": "TDSTCS",
+            "GSTUserName": gstUserName,
+            "AuthToken": authToken,
+            "ReturnPeriod": returnPeriod
+        };
+
+        // Add optional parameters if provided
+        if (recordType) {
+            headers["RecordType"] = recordType; // Max length 4 (e.g., "TDC")
+        }
+
+        if (fromTime) {
+            headers["FromTime"] = fromTime; // Format: DD-MM-YYYY HH:mm (e.g., "01-12-2025 00:00")
+        }
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR2X_URL,
+            {},
+            { headers }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR2X TDS-TCS credit details fetched successfully",
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch GSTR2X TDS-TCS credit details",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR2X API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR1_SAVE_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGSTR1Save";
+router.post("/api/microvista/production-save-gstr1", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, gstr1Data, gstUserName } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstr1Data || !gstUserName) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, returnPeriod, gstUserName or gstr1Data"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+        // const gstUserName = "dharmik12344";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR1_SAVE_URL,
+            gstr1Data, // The actual GSTR1 data payload
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "RETSAVE",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR1 data saved successfully",
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to save GSTR1 data",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR1 Save API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR1_SUBMIT_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGSTR1Submit";
+router.post("/api/microvista/production-submit-gstr1", async (req, res) => {
+    try {
+        const { gstUserName, authToken, returnPeriod } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstUserName) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, gstUserName or returnPeriod"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+        // const gstUserName = "dharmik12344";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR1_SUBMIT_URL,
+            {}, // Empty body as per documentation
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "RETSUBMIT",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR1 submitted successfully",
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to submit GSTR1",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR1 Submit API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR1_SUMMARY_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGetGSTR1Summary";
+router.post("/api/microvista/production-get-gstr1-summary", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, gstUserName } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstUserName) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, returnPeriod, or gstUserName"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR1_SUMMARY_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "RETSUM",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success - Check if we have sec_sum data (even with Status: 0)
+        if (data?.sec_sum && Array.isArray(data.sec_sum)) {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR1 summary fetched successfully",
+                summary: data,
+                gstin: data.gstin,
+                returnPeriod: data.ret_period,
+                sections: data.sec_sum,
+                // raw: data
+            });
+        }
+
+        // ❌ Failure - Only if no data or error message
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || data?.error_message || "Failed to fetch GSTR1 summary or no data available",
+            errorCode: data?.ErrorCode || data?.error_cd,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR1 Summary API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR1_FILE_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGSTR1File";
+router.post("/api/microvista/production-file-gstr1", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, gstUserName } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstUserName) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, returnPeriod, or gstUserName"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR1_FILE_URL,
+            {}, // Empty body as per documentation
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "RETFILE",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR1 filed successfully",
+                acknowledgementNumber: data.ack_num,
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to file GSTR1",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR1 File API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_CASH_LEDGER_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGetCashLedgerDetail";
+router.post("/api/microvista/production-get-cash-ledger", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, gstUserName, fromDate, toDate } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstUserName || !fromDate || !toDate) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, returnPeriod, gstUserName, fromDate, or toDate"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_CASH_LEDGER_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "CASH",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod,
+                    "FromDate": fromDate, // Format: DD-MM-YYYY
+                    "ToDate": toDate       // Format: DD-MM-YYYY
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "Cash ledger details fetched successfully",
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch cash ledger details",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista Cash Ledger API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_ITC_LEDGER_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGetITCLedgerDetail";
+router.post("/api/microvista/production-get-itc-ledger", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, gstUserName, fromDate, toDate } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstUserName || !fromDate || !toDate) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, returnPeriod, gstUserName, fromDate, or toDate"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_ITC_LEDGER_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "ITC",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod,
+                    "FromDate": fromDate, // Format: DD-MM-YYYY
+                    "ToDate": toDate       // Format: DD-MM-YYYY
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "ITC ledger details fetched successfully",
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch ITC ledger details",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista ITC Ledger API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+// This below api not working properly
+const MICROVISTA_LIABILITY_LEDGER_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGetLiabilityLedgerDetail";
+router.post("/api/microvista/production-get-liability-ledger", async (req, res) => {
+    try {
+        const { authToken, gstUserName, fromDate, toDate } = req.body;
+
+        // Validate required fields
+        if (!authToken || !gstUserName || !fromDate || !toDate) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, gstUserName, fromDate, or toDate"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_LIABILITY_LEDGER_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "TAX",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "FromDate": fromDate, // Format: DD-MM-YYYY
+                    "ToDate": toDate       // Format: DD-MM-YYYY
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "Liability ledger details fetched successfully",
+                data: data,
+                // raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch liability ledger details",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista Liability Ledger API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_ITC_BALANCE_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGetITCBalance";
+router.post("/api/microvista/production-get-itc-balance", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, gstUserName } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstUserName) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, returnPeriod, or gstUserName"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_ITC_BALANCE_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "BAL",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "Cash and ITC balance fetched successfully",
+                balance: data,
+                // raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch Cash and ITC balance",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista ITC Balance API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GET_PREFERENCE_URL = "https://www.ewaybills.com/MVGSTAPI/MVGetAllPreference";
+router.post("/api/microvista/production-get-all-preference", async (req, res) => {
+    try {
+        const { authToken, gstUserName, financialYear } = req.body;
+
+        // Validate required fields
+        if (!authToken || !gstUserName || !financialYear) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, gstUserName, or financialYear"
+            });
+        }
+
+        // Validate financial year format (YYYY-YY)
+        const fyRegex = /^\d{4}-\d{2}$/;
+        if (!fyRegex.test(financialYear)) {
+            return res.status(400).send({
+                status: false,
+                message: "Invalid financial year format. Use YYYY-YY (e.g., 2024-25)"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GET_PREFERENCE_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "GETPREF",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "FinancialYear": financialYear // Format: YYYY-YY (e.g., 2024-25)
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "Preferences fetched successfully",
+                preferences: data,
+                // raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch preferences",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista Get Preference API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GET_OTHER_PREFERENCE_URL = "https://www.ewaybills.com/MVGSTAPI/MVGetOtherPreference";
+router.post("/api/microvista/production-get-other-party-preference", async (req, res) => {
+    try {
+        const { toGSTIN, financialYear } = req.body;
+
+        // Validate required fields
+        if (!toGSTIN || !financialYear) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: toGSTIN or financialYear"
+            });
+        }
+
+        // Validate GSTIN format (15 characters alphanumeric)
+        const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+        if (!gstinRegex.test(toGSTIN)) {
+            return res.status(400).send({
+                status: false,
+                message: "Invalid ToGSTIN format. Must be 15 characters (e.g., 27AAPFU0939F1ZV)"
+            });
+        }
+
+        // Validate financial year format (YYYY-YY)
+        const fyRegex = /^\d{4}-\d{2}$/;
+        if (!fyRegex.test(financialYear)) {
+            return res.status(400).send({
+                status: false,
+                message: "Invalid financial year format. Use YYYY-YY (e.g., 2024-25)"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GET_OTHER_PREFERENCE_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "GETPREF",
+                    "ToGSTIN": toGSTIN,           // Other party's GSTIN
+                    "FinancialYear": financialYear // Format: YYYY-YY (e.g., 2024-25)
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "Other party preferences fetched successfully",
+                toGSTIN: toGSTIN,
+                preferences: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch other party preferences",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista Get Other Party Preference API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+// This below api not working properly
+const MICROVISTA_SAVE_PREFERENCE_URL = "https://www.ewaybills.com/MVGSTAPI/MVSavePreference";
+router.post("/api/microvista/production-gst-save-preference", async (req, res) => {
+    try {
+        const { authToken, gstUserName, financialYear, preferenceData } = req.body;
+
+        // Validate required fields
+        if (!authToken || !gstUserName || !financialYear || !preferenceData) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, gstUserName, financialYear, or preferenceData"
+            });
+        }
+
+        // Validate preference data structure
+        if (!preferenceData.gstin || !preferenceData.fy || !preferenceData.quarter || !preferenceData.preference) {
+            return res.status(400).send({
+                status: false,
+                message: "Invalid preferenceData. Required fields: gstin, fy, quarter, preference"
+            });
+        }
+
+        // Validate financial year format (YYYY-YY)
+        const fyRegex = /^\d{4}-\d{2}$/;
+        if (!fyRegex.test(financialYear) || !fyRegex.test(preferenceData.fy)) {
+            return res.status(400).send({
+                status: false,
+                message: "Invalid financial year format. Use YYYY-YY (e.g., 2024-25)"
+            });
+        }
+
+        // Validate quarter
+        const validQuarters = ["Q1", "Q2", "Q3", "Q4"];
+        if (!validQuarters.includes(preferenceData.quarter)) {
+            return res.status(400).send({
+                status: false,
+                message: "Invalid quarter. Must be Q1, Q2, Q3, or Q4"
+            });
+        }
+
+        // Validate preference type
+        const validPreferences = ["Q", "M"]; // Q = Quarterly, M = Monthly
+        if (!validPreferences.includes(preferenceData.preference)) {
+            return res.status(400).send({
+                status: false,
+                message: "Invalid preference. Must be 'Q' (Quarterly) or 'M' (Monthly)"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_SAVE_PREFERENCE_URL,
+            preferenceData,
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "GETPREF",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "FinancialYear": financialYear
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1" || data?.status_cd === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "Preference saved successfully",
+                data: data,
+                // raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to save preference",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista Save Preference API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR3B_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGetGSTR3B";
+router.post("/api/microvista/production-get-gst-gstr3b", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, gstUserName } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstUserName) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, returnPeriod, or gstUserName"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR3B_URL,
+            {},
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "RETSUM",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR3B data fetched successfully",
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to fetch GSTR3B data",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR3B API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR3B_SAVE_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGSTR3BSave";
+router.post("/api/microvista/production-save-gstr3b", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, gstUserName, gstr3bData } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstUserName || !gstr3bData) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, returnPeriod, gstUserName, or gstr3bData"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR3B_SAVE_URL,
+            gstr3bData, // The actual GSTR3B data payload
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "RETSAVE",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR3B saved successfully",
+                referenceId: data.reference_id,
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to save GSTR3B",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR3B Save API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR3B_OFFSET_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGSTR3BRTNOFFSET";
+router.post("/api/microvista/production-offset-gstr3b-liability", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, gstUserName, offsetData } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstUserName || !offsetData) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, returnPeriod, gstUserName, or offsetData"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR3B_OFFSET_URL,
+            offsetData, // The offset liability data payload
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "RETOFFSET",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: data.message || "Payment of tax successfully done",
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to offset liability",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR3B Offset Liability API",
+            error: err.response?.data || err.message
+        });
+    }
+});
+
+const MICROVISTA_GSTR3B_FILE_URL = "https://www.ewaybills.com/MVGSTAPI/MVENCGSTR3BFile";
+router.post("/api/microvista/production-file-gstr3b", async (req, res) => {
+    try {
+        const { authToken, returnPeriod, gstUserName } = req.body;
+
+        // Validate required fields
+        if (!authToken || !returnPeriod || !gstUserName) {
+            return res.status(400).send({
+                status: false,
+                message: "Missing required fields: authToken, returnPeriod, or gstUserName"
+            });
+        }
+
+        // Credentials
+        const MVApiKey = "v4uuPlRON2SJDFn";
+        const MVSecretKey = "k+QCsQ82OMMsoPSjvkO/cw==";
+        const gstin = "19ABCCA1254E1Z1";
+
+        // Make API call
+        const response = await axios.post(
+            MICROVISTA_GSTR3B_FILE_URL,
+            {}, // Empty body as per documentation
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "MVApiKey": MVApiKey,
+                    "MVSecretKey": MVSecretKey,
+                    "GSTIN": gstin,
+                    "Action": "RETFILE",
+                    "GSTUserName": gstUserName,
+                    "AuthToken": authToken,
+                    "ReturnPeriod": returnPeriod
+                }
+            }
+        );
+
+        const data = response.data;
+
+        // ✅ Success
+        if (data?.Status === 1 || data?.Status === "1") {
+            return res.status(200).send({
+                status: true,
+                message: "GSTR3B filed successfully",
+                acknowledgementNumber: data.ack_num,
+                data: data,
+                raw: data
+            });
+        }
+
+        // ❌ Failure
+        return res.status(400).send({
+            status: false,
+            message: data?.ErrorMessage || "Failed to file GSTR3B",
+            errorCode: data?.ErrorCode,
+            raw: data
+        });
+
+    } catch (err: any) {
+        return res.status(500).send({
+            status: false,
+            message: "Exception while calling Microvista GSTR3B File API",
+            error: err.response?.data || err.message
+        });
+    }
+});
 export default router;
